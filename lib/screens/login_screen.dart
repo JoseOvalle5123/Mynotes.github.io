@@ -1,3 +1,7 @@
+// lib/screens/login_screen.dart
+// Actualizado para ser compatible con Firebase Auth
+// El AuthService ahora retorna User? en lugar de bool
+
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'home_screen.dart';
@@ -9,63 +13,64 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-
 class _LoginScreenState extends State<LoginScreen> {
-  final emailController = TextEditingController();
+  final emailController    = TextEditingController();
   final passwordController = TextEditingController();
-  final authService = AuthService();
-  
-  bool isLoading = false;
-  
-  //Metodo login que se encarga de validar los campos, mostrar un loading mientras se hace la petición y manejar la respuesta para navegar a HomeScreen o mostrar un error.
-  Future<void> login() async {
-    final email = emailController.text.trim();
+  final authService        = AuthService();
+
+  bool isLoading  = false;
+  bool isRegister = false; // Alternar entre Login y Registro
+
+  // ── LOGIN / REGISTRO ────────────────────────
+  Future<void> _submit() async {
+    final email    = emailController.text.trim();
     final password = passwordController.text.trim();
 
-     if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Completa todos los campos')),
-      );
+    if (email.isEmpty || password.isEmpty) {
+      _showSnack('Completa todos los campos');
       return;
     }
 
-   setState(() => isLoading = true);
+    setState(() => isLoading = true);
 
-   try {
-      final isValid = await authService.login(email, password);
+    try {
+      final user = isRegister
+          ? await authService.register(email, password)  // Registro Firebase
+          : await authService.login(email, password);    // Login Firebase
 
       if (!mounted) return;
-      // Si el login es exitoso, navegamos a HomeScreen. Si no, mostramos un mensaje de error.
-      if (isValid) {
+
+      if (user != null) {
+        // Éxito: navegar a HomeScreen
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Usuario o contraseña inválidos')),
-        );
+        _showSnack('Usuario o contraseña inválidos');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error de conexión')),
-      );
+      // El AuthService lanza mensajes de error ya traducidos al español
+      _showSnack(e.toString());
     } finally {
-      if (mounted) {
-        setState(() => isLoading = false);
-      }
+      if (mounted) setState(() => isLoading = false);
     }
   }
-  
 
-  //Aquí se construye la interfaz visual.
+  void _showSnack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg)),
+    );
+  }
+
+  // ── UI ──────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Login')),
-       body: LayoutBuilder(  // Esto nos permite que sea responsive y se adapte a diferentes tamaños de pantalla.
+      appBar: AppBar(title: Text(isRegister ? 'Crear cuenta' : 'Login')),
+      body: LayoutBuilder(
         builder: (context, constraints) {
-          return SingleChildScrollView(  // Esto permite que el contenido este centrado y no ocurra un overflow cuando el teclado aparezca.
+          return SingleChildScrollView(
             child: Center(
               child: ConstrainedBox(
                 constraints: BoxConstraints(
@@ -76,42 +81,76 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+                      // Icono de nube
+                      const Icon(Icons.cloud, size: 72, color: Colors.blue),
+                      const SizedBox(height: 8),
                       Text(
-                        'Bienvenido',
+                        isRegister ? 'Crear cuenta' : 'Bienvenido',
                         style: Theme.of(context).textTheme.headlineMedium,
                       ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Tus notas sincronizadas en la nube ☁️',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: Colors.grey),
+                      ),
                       const SizedBox(height: 30),
+
+                      // Campo Email
                       TextField(
                         controller: emailController,
+                        keyboardType: TextInputType.emailAddress,
                         decoration: const InputDecoration(
                           labelText: 'Email',
                           border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.email),
                         ),
                       ),
                       const SizedBox(height: 16),
+
+                      // Campo Contraseña
                       TextField(
                         controller: passwordController,
-                        decoration: const InputDecoration(
-                          labelText: 'Password',
-                          border: OutlineInputBorder(),
-                        ),
                         obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Contraseña',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.lock),
+                        ),
                       ),
                       const SizedBox(height: 24),
+
+                      // Botón principal (Login o Registro)
                       SizedBox(
                         width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: isLoading ? null : login,
-                          child: isLoading
-                              ? const  SizedBox(
-                                  width: 20,
-                                  height: 20,
+                        child: ElevatedButton.icon(
+                          onPressed: isLoading ? null : _submit,
+                          icon: isLoading
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Text('Ingresar'),
+                              : Icon(
+                                  isRegister ? Icons.person_add : Icons.login),
+                          label: Text(isRegister ? 'Crear cuenta' : 'Ingresar'),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Alternar entre Login y Registro
+                      TextButton(
+                        onPressed: () =>
+                            setState(() => isRegister = !isRegister),
+                        child: Text(
+                          isRegister
+                              ? '¿Ya tienes cuenta? Inicia sesión'
+                              : '¿No tienes cuenta? Regístrate',
                         ),
                       ),
                     ],
