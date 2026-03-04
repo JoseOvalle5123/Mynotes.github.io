@@ -1,6 +1,4 @@
-// lib/services/note_service.dart
-// Servicio de Notas con Firebase Firestore
-// Conceptos: Almacenamiento en la Nube + APIs de Sincronización
+
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/note.dart';
